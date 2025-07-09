@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IAI - Inteligência Artificial para Inovação</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lottie Player -->
+    <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
+    
+    <!-- Marked.js para renderizar Markdown -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <!-- DOMPurify para sanitizar HTML (Segurança) -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+
+    <style>
+        /* Estilos Globais e Reset */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9; /* slate-100 */
+            overflow: hidden;
+        }
+
+        /* Estilos da Barra de Rolagem */
+        .chat-container::-webkit-scrollbar { width: 8px; }
+        .chat-container::-webkit-scrollbar-track { background: transparent; }
+        .chat-container::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
+
+        /* Animação de "Digitando" */
+        .typing-indicator span {
+            height: 10px; width: 10px; background-color: #94a3b8;
+            display: inline-block; border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+        .typing-indicator span:nth-of-type(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-of-type(2) { animation-delay: -0.16s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1.0); } }
+
+        /* Estilos para Conteúdo Markdown */
+        .markdown-content h1, .markdown-content h2, .markdown-content h3 { font-weight: 600; margin-top: 1rem; margin-bottom: 0.5rem; }
+        .markdown-content p { margin-bottom: 1rem; line-height: 1.6; }
+        .markdown-content p:last-child { margin-bottom: 0; }
+        .markdown-content ul, .markdown-content ol { margin-left: 1.5rem; margin-bottom: 1rem; }
+        .markdown-content li { margin-bottom: 0.25rem; }
+        .markdown-content a { color: #4f46e5; text-decoration: underline; }
+        .markdown-content code:not(pre > code) { background-color: #eef2ff; color: #4338ca; padding: 0.2rem 0.4rem; border-radius: 0.25rem; font-size: 0.9em; }
+        .markdown-content pre { background-color: #1e293b; color: #e2e8f0; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; margin-bottom: 1rem; }
+
+        /* Lógica para Sidebar Retrátil no Desktop */
+        #sidebar.desktop-collapsed {
+            width: 5rem; /* Largura da barra retraída */
+        }
+        #sidebar.desktop-collapsed .hide-on-collapse {
+            display: none;
+        }
+        #sidebar.desktop-collapsed #desktop-sidebar-toggle .icon-open {
+             display: block;
+        }
+         #sidebar.desktop-collapsed #desktop-sidebar-toggle .icon-close {
+             display: none;
+        }
+        #sidebar:not(.desktop-collapsed) #desktop-sidebar-toggle .icon-open {
+             display: none;
+        }
+         #sidebar:not(.desktop-collapsed) #desktop-sidebar-toggle .icon-close {
+             display: block;
+        }
+    </style>
+     <!-- Fonte Inter do Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-slate-100">
+
+    <div class="relative flex h-screen">
+        <!-- Barra Lateral (Sidebar) -->
+        <aside id="sidebar" class="bg-white p-6 border-r border-slate-200 flex flex-col justify-between absolute md:relative inset-y-0 left-0 z-30 w-4/5 md:w-1/4 transform -translate-x-full md:translate-x-0 transition-all duration-300 ease-in-out">
+            <div>
+                <div class="flex justify-between items-center mb-6">
+                    <h1 class="text-2xl font-bold text-slate-800 hide-on-collapse">IAI 💡</h1>
+                    <!-- Botão para retrair no desktop -->
+                    <button id="desktop-sidebar-toggle" class="p-2 rounded-md hover:bg-slate-100 hidden md:block">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 icon-close" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 icon-open" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+                    </button>
+                    <!-- Botão para fechar no mobile -->
+                    <button id="sidebar-close" class="p-2 rounded-md hover:bg-slate-100 md:hidden">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+                
+                <img src="/img/logo.jpg" alt="Logo IAI" class="mb-4 rounded-lg hide-on-collapse" onerror="this.onerror=null; this.src='https://placehold.co/400x200/e2e8f0/64748b?text=Logo+IAI';">
+
+                <div class="hide-on-collapse">
+                    <lottie-player src="https://assets4.lottiefiles.com/packages/lf20_touohxv0.json" background="transparent" speed="1" style="width: 100%; height: 200px;" loop autoplay></lottie-player>
+                    <hr class="my-6 border-slate-200">
+                    <div class="text-xs text-slate-500 space-y-2">
+                        <p>Esta interface se conecta a um fluxo de trabalho de automação (n8n) para gerar respostas inteligentes e contextuais.</p>
+                        <p>Suporte: <a href="mailto:contato@sia.pi.gov.br" class="text-indigo-600 hover:underline">contato@sia.pi.gov.br</a></p>
+                    </div>
+                </div>
+            </div>
+            <div class="text-center text-xs text-slate-400 mt-6 hide-on-collapse">
+                <span>@Desenvolvido pela Equipe da SIA</span>
+            </div>
+        </aside>
+
+        <!-- Overlay para fechar a sidebar em mobile -->
+        <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden md:hidden"></div>
+
+        <!-- Área Principal do Chat -->
+        <main class="flex-1 flex flex-col h-screen w-full">
+            <header class="bg-white border-b border-slate-200 p-4 flex items-center">
+                <button id="sidebar-open" class="mr-4 p-2 rounded-md hover:bg-slate-100 md:hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                </button>
+                <h2 class="text-xl font-semibold text-slate-800">Converse com a IAI</h2>
+            </header>
+
+            <div id="chat-container" class="flex-1 p-6 overflow-y-auto chat-container"></div>
+
+            <div class="bg-white border-t border-slate-200 p-4">
+                <form id="chat-form" class="flex items-center space-x-4">
+                    <input type="text" id="chat-input" placeholder="Digite sua pergunta para a IAI..." class="flex-1 p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none transition" autocomplete="off">
+                    <button type="submit" class="bg-indigo-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-indigo-700 transition shadow active:scale-95">Enviar</button>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Seletores do DOM ---
+            const chatForm = document.getElementById('chat-form');
+            const chatInput = document.getElementById('chat-input');
+            const chatContainer = document.getElementById('chat-container');
+            const sidebar = document.getElementById('sidebar');
+            const sidebarOpen = document.getElementById('sidebar-open');
+            const sidebarClose = document.getElementById('sidebar-close');
+            const sidebarOverlay = document.getElementById('sidebar-overlay');
+            const desktopSidebarToggle = document.getElementById('desktop-sidebar-toggle');
+
+            // --- Estado da Aplicação ---
+            let sessionId = localStorage.getItem('chatSessionId') || crypto.randomUUID();
+            localStorage.setItem('chatSessionId', sessionId);
+            
+            let messages = [];
+            try {
+                messages = JSON.parse(localStorage.getItem('chatHistory')) || [];
+            } catch (e) {
+                console.error("Erro ao carregar histórico:", e);
+                messages = [];
+            }
+
+            // --- Funções ---
+            const saveHistory = () => localStorage.setItem('chatHistory', JSON.stringify(messages));
+            
+            const renderMarkdown = (text) => DOMPurify.sanitize(marked.parse(text, { breaks: true, gfm: true }));
+
+            const addMessageToUI = (message, save = true) => {
+                if (save) {
+                    messages.push(message);
+                    saveHistory();
+                }
+
+                const parts = message.content.split('\n\n').filter(part => part.trim() !== '');
+                if (parts.length === 0) return;
+
+                const wrapper = document.createElement('div');
+                wrapper.className = 'mb-4 flex';
+                
+                if (message.role === 'user') {
+                    wrapper.classList.add('justify-end');
+                    wrapper.innerHTML = `
+                        <div class="max-w-xl lg:max-w-2xl shadow-sm rounded-lg p-4 bg-indigo-600 text-white">
+                            <div class="markdown-content">${renderMarkdown(message.content)}</div>
+                        </div>`;
+                } else { // Assistant
+                    wrapper.classList.add('items-start', 'space-x-3');
+                    const bubblesContainer = document.createElement('div');
+                    bubblesContainer.className = 'flex flex-col space-y-2';
+
+                    parts.forEach(part => {
+                        const bubble = document.createElement('div');
+                        bubble.className = 'max-w-xl lg:max-w-2xl shadow-sm rounded-lg p-4 bg-white text-slate-800';
+                        bubble.innerHTML = `<div class="markdown-content">${renderMarkdown(part)}</div>`;
+                        bubblesContainer.appendChild(bubble);
+                    });
+
+                    wrapper.innerHTML = `<div class="flex-shrink-0 w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white font-bold">IAI</div>`;
+                    wrapper.appendChild(bubblesContainer);
+                }
+                
+                chatContainer.appendChild(wrapper);
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            };
+            
+            const toggleTypingIndicator = (show) => {
+                let indicator = document.getElementById('typing-indicator');
+                if (show && !indicator) {
+                    indicator = document.createElement('div');
+                    indicator.id = 'typing-indicator';
+                    indicator.className = 'mb-4 flex items-start space-x-3';
+                    indicator.innerHTML = `
+                        <div class="flex-shrink-0 w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white font-bold">IAI</div>
+                        <div class="bg-white p-4 rounded-lg shadow-sm flex items-center">
+                            <div class="typing-indicator"><span></span><span></span><span></span></div>
+                        </div>`;
+                    chatContainer.appendChild(indicator);
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                } else if (!show && indicator) {
+                    indicator.remove();
+                }
+            };
+            
+            const loadHistory = () => {
+                if (messages.length > 0) {
+                    messages.forEach(msg => addMessageToUI(msg, false));
+                } else {
+                    addMessageToUI({ role: 'assistant', content: 'Olá! Eu sou a **IAI**, sua Inteligência Artificial para **Inovação**. Como posso ajudar você hoje?' });
+                }
+            };
+
+            const handleFormSubmit = async (e) => {
+                e.preventDefault();
+                const userMessage = chatInput.value.trim();
+                if (!userMessage) return;
+
+                addMessageToUI({ role: 'user', content: userMessage });
+                chatInput.value = '';
+                chatInput.focus();
+                toggleTypingIndicator(true);
+
+                try {
+                    const response = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: userMessage, sessionId: sessionId }),
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || `Erro do servidor: ${response.status}`);
+                    }
+                    const data = await response.json();
+                    addMessageToUI({ role: 'assistant', content: data.reply });
+                    
+                } catch (error) {
+                    console.error('Erro ao enviar mensagem:', error);
+                    const errorMessage = `Desculpe, ocorreu um erro. Por favor, tente novamente. Se o problema persistir, entre em contato com <a href="mailto:contato@sia.pi.gov.br" class="underline">contato@sia.pi.gov.br</a>. (Detalhe: ${error.message})`;
+                    addMessageToUI({ role: 'assistant', content: errorMessage });
+                } finally {
+                    toggleTypingIndicator(false);
+                }
+            };
+            
+            // --- Lógica da Sidebar ---
+            const openSidebar = () => {
+                sidebar.classList.remove('-translate-x-full');
+                sidebarOverlay.classList.remove('hidden');
+            };
+            const closeSidebar = () => {
+                sidebar.classList.add('-translate-x-full');
+                sidebarOverlay.classList.add('hidden');
+            };
+            
+            // Mobile
+            sidebarOpen.addEventListener('click', openSidebar);
+            sidebarClose.addEventListener('click', closeSidebar);
+            sidebarOverlay.addEventListener('click', closeSidebar);
+
+            // Desktop
+            desktopSidebarToggle.addEventListener('click', () => {
+                sidebar.classList.toggle('desktop-collapsed');
+                localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('desktop-collapsed'));
+            });
+            
+            // --- Event Listeners ---
+            chatForm.addEventListener('submit', handleFormSubmit);
+
+            // --- Inicialização ---
+            if (localStorage.getItem('sidebarCollapsed') === 'true') {
+                sidebar.classList.add('desktop-collapsed');
+            }
+            loadHistory();
+        });
+    </script>
+</body>
+</html>
