@@ -30,6 +30,10 @@ const chatLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => {
+    // Em Vercel, usar X-Forwarded-For; senão usar IP direto
+    return req.headers['x-forwarded-for']?.split(',')[0].trim() || req.ip || 'unknown';
+  },
   message: { error: 'Muitas requisições enviadas. Por favor, aguarde 15 minutos antes de tentar novamente.' }
 });
 
