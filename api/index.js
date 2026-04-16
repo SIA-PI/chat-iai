@@ -1,19 +1,18 @@
 const express = require('express');
 const axios = require('axios');
-const path = require('path');
 const cors = require('cors');
+const path = require('path');
 const fs = require('fs');
 const rateLimit = require('express-rate-limit');
-const logger = require('./data/logger');
-const { saveConversation, getConversationsBySession } = require('./data/db');
-const { config, validateConfig } = require('./data/config');
+const logger = require('../data/logger');
+const { saveConversation, getConversationsBySession } = require('../data/db');
+const { config, validateConfig } = require('../data/config');
 
 const app = express();
-const PORT = config.server.port;
 
 // Carregar system prompt do agente IAI
 const systemPrompt = fs.readFileSync(
-  path.join(__dirname, 'data', 'Prompt.md'),
+  path.join(__dirname, '..', 'data', 'Prompt.md'),
   'utf-8'
 );
 
@@ -28,11 +27,6 @@ const chatLimiter = rateLimit({
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
-
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
 
 app.post('/api/chat', chatLimiter, async (req, res) => {
   const { message, sessionId, recaptchaToken } = req.body;
@@ -287,6 +281,4 @@ app.post('/api/stream', chatLimiter, async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  logger.info(`Servidor rodando em http://localhost:${PORT}`);
-});
+module.exports = app;

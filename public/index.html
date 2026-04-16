@@ -17,6 +17,9 @@
     <!-- DOMPurify para sanitizar HTML (Segurança) -->
     <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
 
+    <!-- Google reCAPTCHA v3 (chave pública - seguro para expor no frontend) -->
+    <script src="https://www.google.com/recaptcha/api.js?render=6LcsibosAAAAADH8WtsMiwaKnqSpD2c319viHGBp"></script>
+
     <style>
         /* Estilos Globais e Reset */
         body {
@@ -69,6 +72,11 @@
          #sidebar:not(.desktop-collapsed) #desktop-sidebar-toggle .icon-close {
              display: block;
         }
+
+        /* Ocultar badge do reCAPTCHA (LGPD: aviso de privacidade no footer) */
+        .grecaptcha-badge {
+            visibility: hidden;
+        }
     </style>
      <!-- Fonte Inter do Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -105,8 +113,9 @@
                     </div>
                 </div>
             </div>
-            <div class="text-center text-xs text-slate-400 mt-6 hide-on-collapse">
+            <div class="text-center text-xs text-slate-400 mt-6 hide-on-collapse space-y-2">
                 <span>@Desenvolvido pela Equipe da SIA</span>
+                <p class="text-slate-500 text-[10px] leading-tight">Este site é protegido pelo reCAPTCHA da Google e estão sujeitos à <a href="https://policies.google.com/privacy" target="_blank" class="underline hover:text-slate-600">Política de Privacidade</a> e aos <a href="https://policies.google.com/terms" target="_blank" class="underline hover:text-slate-600">Termos de Serviço</a> do Google.</p>
             </div>
         </aside>
 
@@ -126,7 +135,7 @@
 
             <div class="bg-white border-t border-slate-200 p-4">
                 <form id="chat-form" class="flex items-center space-x-4">
-                    <input type="text" id="chat-input" placeholder="Digite sua pergunta para a IAI..." class="flex-1 p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none transition" autocomplete="off">
+                    <input type="text" id="chat-input" placeholder="Digite sua pergunta (ou /clear para limpar)..." class="flex-1 p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none transition" autocomplete="off">
                     <button type="submit" class="bg-indigo-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-indigo-700 transition shadow active:scale-95">Enviar</button>
                 </form>
             </div>
@@ -226,10 +235,39 @@
                 }
             };
 
+            const criarBubbleStream = () => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'mb-4 flex items-start space-x-3';
+                const avatar = document.createElement('div');
+                avatar.className = 'flex-shrink-0 w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white font-bold';
+                avatar.textContent = 'IAI';
+                const bubble = document.createElement('div');
+                bubble.className = 'max-w-xl lg:max-w-2xl shadow-sm rounded-lg p-4 bg-white text-slate-800';
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'markdown-content';
+                bubble.appendChild(contentDiv);
+                wrapper.appendChild(avatar);
+                wrapper.appendChild(bubble);
+                return { wrapper, contentDiv };
+            };
+
             const handleFormSubmit = async (e) => {
                 e.preventDefault();
                 const userMessage = chatInput.value.trim();
                 if (!userMessage) return;
+
+                // Comando /clear
+                if (userMessage === '/clear') {
+                    chatInput.value = '';
+                    chatContainer.innerHTML = '';
+                    messages = [];
+                    localStorage.removeItem('chatHistory');
+                    localStorage.removeItem('chatSessionId');
+                    sessionId = crypto.randomUUID();
+                    localStorage.setItem('chatSessionId', sessionId);
+                    addMessageToUI({ role: 'assistant', content: 'Conversa reiniciada! 🔄 Como posso ajudar?' }, false);
+                    return;
+                }
 
                 addMessageToUI({ role: 'user', content: userMessage });
                 chatInput.value = '';
@@ -237,19 +275,62 @@
                 toggleTypingIndicator(true);
 
                 try {
-                    const response = await fetch('/api/chat', {
+                    // Gerar token reCAPTCHA v3
+                    if (typeof grecaptcha === 'undefined') {
+                        throw new Error('Verificação de segurança ainda não carregou. Por favor, tente novamente.');
+                    }
+                    const recaptchaToken = await grecaptcha.execute('6LcsibosAAAAADH8WtsMiwaKnqSpD2c319viHGBp', { action: 'chat' });
+
+                    // Criar bubble vazia do assistente
+                    const streamWrapper = criarBubbleStream();
+                    chatContainer.appendChild(streamWrapper.wrapper);
+                    toggleTypingIndicator(false);
+
+                    const response = await fetch('/api/stream', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ message: userMessage, sessionId: sessionId }),
+                        body: JSON.stringify({
+                            message: userMessage,
+                            sessionId: sessionId,
+                            recaptchaToken: recaptchaToken
+                        }),
                     });
 
                     if (!response.ok) {
                         const errorData = await response.json();
                         throw new Error(errorData.error || `Erro do servidor: ${response.status}`);
                     }
-                    const data = await response.json();
-                    addMessageToUI({ role: 'assistant', content: data.reply });
-                    
+
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    let accumulatedText = '';
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        const text = decoder.decode(value);
+                        const lines = text.split('\n').filter(l => l.startsWith('data: '));
+
+                        for (const line of lines) {
+                            const json = line.replace('data: ', '').trim();
+                            if (json === '[DONE]') break;
+                            try {
+                                const parsed = JSON.parse(json);
+                                if (parsed.error) throw new Error(parsed.error);
+                                if (parsed.delta) {
+                                    accumulatedText += parsed.delta;
+                                    streamWrapper.contentDiv.innerHTML = renderMarkdown(accumulatedText);
+                                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                                }
+                            } catch (_) {}
+                        }
+                    }
+
+                    // Salvar no histórico local após stream completo
+                    messages.push({ role: 'assistant', content: accumulatedText });
+                    saveHistory();
+
                 } catch (error) {
                     console.error('Erro ao enviar mensagem:', error);
                     const errorMessage = `Desculpe, ocorreu um erro. Por favor, tente novamente. Se o problema persistir, entre em contato com <a href="mailto:contato@sia.pi.gov.br" class="underline">contato@sia.pi.gov.br</a>. (Detalhe: ${error.message})`;
