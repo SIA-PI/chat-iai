@@ -11,10 +11,17 @@ const { config, validateConfig } = require('../data/config');
 const app = express();
 
 // Carregar system prompt do agente IAI
-const systemPrompt = fs.readFileSync(
-  path.join(__dirname, '..', 'data', 'Prompt.md'),
-  'utf-8'
-);
+let systemPrompt = '';
+try {
+  systemPrompt = fs.readFileSync(
+    path.join(__dirname, '..', 'data', 'Prompt.md'),
+    'utf-8'
+  );
+} catch (err) {
+  // Fallback para Vercel: usar prompt padrão simples
+  logger.warn('Não foi possível carregar Prompt.md, usando fallback');
+  systemPrompt = 'Você é um assistente amigável de IA chamado IAI. Ajude o usuário da melhor forma possível.';
+}
 
 // Rate limiter: 20 requisições por 15 minutos por IP
 const chatLimiter = rateLimit({

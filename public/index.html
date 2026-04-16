@@ -297,8 +297,12 @@
                     });
 
                     if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.error || `Erro do servidor: ${response.status}`);
+                        try {
+                            const errorData = await response.json();
+                            throw new Error(errorData.error || `Erro do servidor: ${response.status}`);
+                        } catch (e) {
+                            throw new Error(`Erro do servidor: ${response.status}. Por favor, tente novamente.`);
+                        }
                     }
 
                     const reader = response.body.getReader();
