@@ -33,7 +33,7 @@ const chatLimiter = rateLimit({
   keyGenerator: (req) => {
     return req.headers['x-forwarded-for']?.split(',')[0].trim() || req.ip || 'unknown';
   },
-  validate: { ipKeyGenerator: false },
+  validate: { keyGeneratorIpFallback: false },
   message: { error: 'Muitas requisições enviadas. Por favor, aguarde 15 minutos antes de tentar novamente.' }
 });
 
