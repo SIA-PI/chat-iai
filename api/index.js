@@ -64,7 +64,9 @@ app.post('/api/chat', chatLimiter, async (req, res) => {
 
   // Verificação reCAPTCHA
   const isLocalhost = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
-  if (!isLocalhost) {
+  const isDevelopment = process.env.VERCEL !== '1' || isLocalhost;
+
+  if (!isDevelopment) {
     // Em produção: validação rigorosa
     try {
       const verifyResponse = await axios.post(
@@ -89,8 +91,8 @@ app.post('/api/chat', chatLimiter, async (req, res) => {
       return res.status(503).json({ error: 'Serviço de verificação indisponível. Tente novamente em instantes.' });
     }
   } else {
-    // Em localhost: apenas log de debug
-    logger.info(`reCAPTCHA skipped em localhost (development mode)`);
+    // Em desenvolvimento/Vercel: apenas log de debug
+    logger.info(`reCAPTCHA skipped (development mode, VERCEL=${process.env.VERCEL || 'undefined'})`);
   }
 
   const previousConversations = getConversationsBySession(trimmedSessionId, 10);
