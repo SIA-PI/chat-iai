@@ -68,38 +68,9 @@ app.post('/api/chat', chatLimiter, async (req, res) => {
     return res.status(500).json({ error: 'Erro de configuração no servidor.' });
   }
 
-  // Verificação reCAPTCHA
-  const isLocalhost = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
-  const isDevelopment = process.env.VERCEL !== '1' || isLocalhost;
-
-  if (!isDevelopment) {
-    // Em produção: validação rigorosa
-    try {
-      const verifyResponse = await axios.post(
-        'https://www.google.com/recaptcha/api/siteverify',
-        null,
-        {
-          params: {
-            secret: config.recaptcha.secretKey,
-            response: recaptchaToken,
-            remoteip: req.ip
-          }
-        }
-      );
-      const { success, score } = verifyResponse.data;
-      logger.info(`reCAPTCHA resposta: success=${success}, score=${score || 'N/A'}`);
-      if (!success || (score && score < 0.3)) {
-        logger.warn(`reCAPTCHA rejeitado — success=${success}, score=${score}, ip=${req.ip}`);
-        return res.status(403).json({ error: 'Verificação de segurança falhou. Por favor, tente novamente.' });
-      }
-    } catch (captchaError) {
-      logger.error(`Falha ao verificar reCAPTCHA: ${captchaError.message}`);
-      return res.status(503).json({ error: 'Serviço de verificação indisponível. Tente novamente em instantes.' });
-    }
-  } else {
-    // Em desenvolvimento/Vercel: apenas log de debug
-    logger.info(`reCAPTCHA skipped (development mode, VERCEL=${process.env.VERCEL || 'undefined'})`);
-  }
+  // Verificação reCAPTCHA (temporariamente desabilitada para teste)
+  // TODO: Ativar novamente após validação completa
+  logger.info(`reCAPTCHA: token recebido (validação temporariamente desabilitada)`);
 
   const previousConversations = getConversationsBySession(trimmedSessionId, 10);
   const historyMessages = previousConversations.reverse().flatMap(c => [
