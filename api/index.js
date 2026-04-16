@@ -10,6 +10,17 @@ const { config, validateConfig } = require('../data/config');
 
 const app = express();
 
+// DEBUG: verificar se rota está sendo criada
+app.get('/api/debug', (req, res) => {
+  res.json({
+    status: 'ok',
+    message: 'API funcionando',
+    hostname: req.hostname,
+    path: req.path,
+    vercel: process.env.VERCEL
+  });
+});
+
 // Carregar system prompt do agente IAI
 let systemPrompt = '';
 try {
@@ -121,25 +132,35 @@ app.post('/api/chat', chatLimiter, async (req, res) => {
 });
 
 app.post('/api/stream', chatLimiter, async (req, res) => {
-  const { message, sessionId, recaptchaToken } = req.body;
+  try {
+    logger.info('📨 /api/stream chamada');
+    const { message, sessionId, recaptchaToken } = req.body;
+    logger.info(`Message: ${message?.substring(0, 20)}..., SessionId: ${sessionId?.substring(0, 8)}...`);
 
-  // Validação de entrada
-  const trimmedMessage = typeof message === 'string' ? message.trim() : '';
-  const trimmedSessionId = typeof sessionId === 'string' ? sessionId.trim() : '';
-  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    // Validação de entrada
+    const trimmedMessage = typeof message === 'string' ? message.trim() : '';
+    const trimmedSessionId = typeof sessionId === 'string' ? sessionId.trim() : '';
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-  if (!trimmedMessage || trimmedMessage.length < 1) {
-    return res.status(400).json({ error: 'A mensagem não pode estar vazia.' });
-  }
-  if (trimmedMessage.length > 2000) {
-    return res.status(400).json({ error: 'A mensagem não pode ter mais de 2000 caracteres.' });
-  }
-  if (!trimmedSessionId || !UUID_REGEX.test(trimmedSessionId)) {
-    return res.status(400).json({ error: 'O sessionId é inválido ou está ausente.' });
-  }
-  if (!recaptchaToken) {
-    return res.status(400).json({ error: 'Token de verificação ausente. Por favor, tente novamente.' });
-  }
+    logger.info(`✓ Validando mensagem: ${trimmedMessage.length} chars`);
+    if (!trimmedMessage || trimmedMessage.length < 1) {
+      logger.warn('❌ Mensagem vazia');
+      return res.status(400).json({ error: 'A mensagem não pode estar vazia.' });
+    }
+    if (trimmedMessage.length > 2000) {
+      logger.warn('❌ Mensagem muito longa');
+      return res.status(400).json({ error: 'A mensagem não pode ter mais de 2000 caracteres.' });
+    }
+    logger.info(`✓ Validando sessionId: ${trimmedSessionId.substring(0, 8)}...`);
+    if (!trimmedSessionId || !UUID_REGEX.test(trimmedSessionId)) {
+      logger.warn('❌ SessionId inválido');
+      return res.status(400).json({ error: 'O sessionId é inválido ou está ausente.' });
+    }
+    if (!recaptchaToken) {
+      logger.warn('❌ reCAPTCHA token ausente');
+      return res.status(400).json({ error: 'Token de verificação ausente. Por favor, tente novamente.' });
+    }
+    logger.info('✓ Todas as validações passaram');
 
   const configErrors = validateConfig();
   if (configErrors.length > 0) {
@@ -247,17 +268,21 @@ app.post('/api/stream', chatLimiter, async (req, res) => {
     });
 
   } catch (error) {
-    if (error.response) {
-      logger.error(`Erro da API no stream: ${error.response.status} - ${JSON.stringify(error.response.data)}`);
-      res.write(`data: ${JSON.stringify({ error: `Erro do serviço de IA: ${error.response.status}` })}\n\n`);
-    } else if (error.request) {
-      logger.warn(`Timeout da API no stream: ${error.message}`);
-      res.write(`data: ${JSON.stringify({ error: 'O serviço de IA demorou muito para responder.' })}\n\n`);
-    } else {
-      logger.error(`Erro interno no stream: ${error.message}`);
-      res.write(`data: ${JSON.stringify({ error: 'Erro interno do servidor.' })}\n\n`);
+      if (error.response) {
+        logger.error(`❌ Erro da API no stream: ${error.response.status} - ${JSON.stringify(error.response.data)}`);
+        res.write(`data: ${JSON.stringify({ error: `Erro do serviço de IA: ${error.response.status}` })}\n\n`);
+      } else if (error.request) {
+        logger.warn(`⏱️ Timeout da API no stream: ${error.message}`);
+        res.write(`data: ${JSON.stringify({ error: 'O serviço de IA demorou muito para responder.' })}\n\n`);
+      } else {
+        logger.error(`❌ Erro interno no stream: ${error.message}`);
+        res.write(`data: ${JSON.stringify({ error: 'Erro interno do servidor.' })}\n\n`);
+      }
+      res.end();
     }
-    res.end();
+  } catch (globalError) {
+    logger.error(`🔥 ERRO GLOBAL em /api/stream: ${globalError.message}`);
+    res.status(500).json({ error: `Erro fatal: ${globalError.message}` });
   }
 });
 
