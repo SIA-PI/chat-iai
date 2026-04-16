@@ -18,7 +18,7 @@
     <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
 
     <!-- Google reCAPTCHA v3 (chave pública - seguro para expor no frontend) -->
-    <script src="https://www.google.com/recaptcha/api.js?render=6LcsibosAAAAADH8WtsMiwaKnqSpD2c319viHGBp"></script>
+    <script src="https://www.google.com/recaptcha/api.js?render=6Le7j7osAAAAACy2h8EnLC9WSAe_oYOlzG3J3j5O"></script>
 
     <style>
         /* Estilos Globais e Reset */
@@ -279,7 +279,7 @@
                     if (typeof grecaptcha === 'undefined') {
                         throw new Error('Verificação de segurança ainda não carregou. Por favor, tente novamente.');
                     }
-                    const recaptchaToken = await grecaptcha.execute('6LcsibosAAAAADH8WtsMiwaKnqSpD2c319viHGBp', { action: 'chat' });
+                    const recaptchaToken = await grecaptcha.execute('6Le7j7osAAAAACy2h8EnLC9WSAe_oYOlzG3J3j5O', { action: 'chat' });
 
                     // Criar bubble vazia do assistente
                     const streamWrapper = criarBubbleStream();

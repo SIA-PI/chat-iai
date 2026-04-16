@@ -173,7 +173,8 @@ app.post('/api/stream', chatLimiter, async (req, res) => {
   }
 
   // Verificação reCAPTCHA
-  const isLocalhost = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
+  const clientIp = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.ip;
+  const isLocalhost = ['localhost', '127.0.0.1'].includes(req.hostname) || clientIp === '127.0.0.1';
   if (!isLocalhost) {
     try {
       const verifyResponse = await axios.post(
@@ -183,14 +184,14 @@ app.post('/api/stream', chatLimiter, async (req, res) => {
           params: {
             secret: config.recaptcha.secretKey,
             response: recaptchaToken,
-            remoteip: req.ip
+            remoteip: clientIp
           }
         }
       );
-      const { success, score } = verifyResponse.data;
-      logger.info(`reCAPTCHA resposta: success=${success}, score=${score || 'N/A'}`);
-      if (!success || (score && score < 0.3)) {
-        logger.warn(`reCAPTCHA rejeitado — success=${success}, score=${score}, ip=${req.ip}`);
+      const data = verifyResponse.data;
+      logger.info(`reCAPTCHA resposta: ${JSON.stringify(data)}`);
+      if (!data.success || (data.score !== undefined && data.score < 0.3)) {
+        logger.warn(`reCAPTCHA rejeitado — success=${data.success}, score=${data.score}, errors=${JSON.stringify(data['error-codes'])}, ip=${clientIp}`);
         return res.status(403).json({ error: 'Verificação de segurança falhou. Por favor, tente novamente.' });
       }
     } catch (captchaError) {
