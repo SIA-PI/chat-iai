@@ -2,11 +2,16 @@ const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 
-const dataDir = __dirname;
+// Em Vercel, usar /tmp para escrita; em local, usar /data
+const dataDir = process.env.VERCEL ? '/tmp' : __dirname;
 const dbPath = path.join(dataDir, 'chat_history.db');
 
-if (!fs.existsSync(dbPath)) {
-  fs.writeFileSync(dbPath, '');
+try {
+  if (!fs.existsSync(dbPath)) {
+    fs.writeFileSync(dbPath, '');
+  }
+} catch (err) {
+  console.error('Aviso: não foi possível criar arquivo de banco de dados:', err.message);
 }
 
 const db = new Database(dbPath);
