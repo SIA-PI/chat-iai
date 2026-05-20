@@ -99,7 +99,7 @@ app.post('/api/chat', chatLimiter, async (req, res) => {
       {
         model: config.openai.model,
         messages: messages,
-        temperature: 0.7
+        temperature: 0.3
       },
       {
         headers: {
@@ -226,7 +226,7 @@ app.post('/api/stream', chatLimiter, async (req, res) => {
       {
         model: config.openai.model,
         messages: messages,
-        temperature: 0.7,
+        temperature: 0.3,
         stream: true
       },
       {
